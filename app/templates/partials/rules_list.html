@@ -1,0 +1,176 @@
+{% if rules %}
+<!-- Bulk toolbar -->
+<div id="rules-bulk-toolbar" class="hidden mb-3 flex items-center gap-3 p-3 bg-[#16213e] rounded-lg border border-slate-700/50">
+  <span id="rules-bulk-count" class="text-sm text-slate-300 flex-shrink-0">0 selected</span>
+  <button onclick="bulkEnableRules(true)" class="px-3 py-1.5 rounded text-xs font-medium bg-green-900/30 text-green-400 border border-green-700/30 hover:bg-green-900/50 transition">Enable</button>
+  <button onclick="bulkEnableRules(false)" class="px-3 py-1.5 rounded text-xs font-medium bg-slate-700 text-slate-300 hover:bg-slate-600 transition">Disable</button>
+  <button onclick="bulkDeleteRules()" class="px-3 py-1.5 rounded text-xs font-medium bg-red-900/20 text-red-400 border border-red-700/30 hover:bg-red-900/40 transition">Delete</button>
+  <button onclick="clearRulesSelection()" class="ml-auto text-xs text-slate-400 hover:text-white transition">✕ Clear</button>
+</div>
+<div class="space-y-4" id="rules-sortable">
+  {% for rule in rules %}
+  <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-5 {% if not rule.enabled %}opacity-60{% endif %}">
+
+    <!-- ── Header: checkbox + name + badges + action buttons ── -->
+    <div class="flex items-start justify-between gap-4 mb-4">
+      <div class="flex items-start gap-3 min-w-0">
+        <input type="checkbox" class="rule-cb mt-1 w-4 h-4 accent-[#e5a00d] flex-shrink-0 cursor-pointer" data-id="{{ rule.id }}" onchange="updateRulesBulkBar()" />
+        <div class="min-w-0">
+          <h4 class="text-base font-semibold text-white mb-2">{{ rule.name }}</h4>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium
+              {% if rule.media_type == 'movie' %}bg-[#e5a00d]/20 text-[#e5a00d]
+              {% elif rule.media_type == 'series' %}bg-sky-900/50 text-sky-300
+              {% else %}bg-slate-700 text-slate-300{% endif %}">
+              {% if rule.media_type == 'movie' %}Movie
+              {% elif rule.media_type == 'series' %}Series
+              {% else %}All media{% endif %}
+            </span>
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium
+              {% if rule.enabled %}bg-green-900/40 text-green-400{% else %}bg-slate-700/60 text-slate-400{% endif %}">
+              {{ 'Enabled' if rule.enabled else 'Disabled' }}
+            </span>
+            {% if rule.schedule_interval_hours %}
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/40 text-purple-300">
+              {% if rule.schedule_interval_hours == 168 %}Weekly
+              {% elif rule.schedule_interval_hours == 24 %}Every 24h
+              {% elif rule.schedule_interval_hours == 12 %}Every 12h
+              {% elif rule.schedule_interval_hours == 6 %}Every 6h
+              {% else %}Every {{ rule.schedule_interval_hours }}h{% endif %}
+            </span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Buttons (top-right) -->
+      <div class="flex flex-col gap-1.5 flex-shrink-0">
+        <div class="flex items-center gap-1.5">
+          <button onclick="previewRule({{ rule.id }})"
+            class="px-3 py-1.5 rounded text-xs font-medium bg-slate-700/60 text-slate-300 hover:bg-slate-600 transition whitespace-nowrap">
+            Preview
+          </button>
+          <button onclick="runRule({{ rule.id }})"
+            class="px-3 py-1.5 rounded text-xs font-medium bg-[#e5a00d]/10 text-[#e5a00d] border border-[#e5a00d]/30 hover:bg-[#e5a00d]/20 transition whitespace-nowrap">
+            Run Now
+          </button>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button onclick="toggleRule({{ rule.id }}, {{ 'false' if rule.enabled else 'true' }})"
+            class="px-3 py-1.5 rounded text-xs font-medium transition whitespace-nowrap
+              {% if rule.enabled %}bg-slate-700 text-slate-300 hover:bg-slate-600
+              {% else %}bg-green-900/30 text-green-400 border border-green-700/30 hover:bg-green-900/50{% endif %}">
+            {{ 'Disable' if rule.enabled else 'Enable' }}
+          </button>
+          <button data-rule='{{ {
+              "id": rule.id, "name": rule.name, "media_type": rule.media_type,
+              "condition_days_unwatched": rule.condition_days_unwatched,
+              "condition_watch_status": rule.condition_watch_status or "",
+              "condition_genres": rule.condition_genres or "",
+              "condition_tags": rule.condition_tags or "",
+              "condition_min_size_gb": rule.condition_min_size_gb or "",
+              "condition_max_size_gb": rule.condition_max_size_gb or "",
+              "condition_resolution": rule.condition_resolution or "[]",
+              "action_unmonitor_arr": rule.action_unmonitor_arr,
+              "action_delete_from_arr": rule.action_delete_from_arr,
+              "action_delete_torrent": rule.action_delete_torrent,
+              "action_delete_files": rule.action_delete_files,
+              "action_delete_from_media_server": rule.action_delete_from_media_server,
+              "schedule_interval_hours": rule.schedule_interval_hours or ""
+            } | tojson }}'
+            onclick="openEditRule(JSON.parse(this.dataset.rule))"
+            class="px-3 py-1.5 rounded text-xs font-medium bg-slate-700/60 text-slate-300 hover:bg-slate-600 transition whitespace-nowrap">
+            Edit
+          </button>
+          <button onclick="deleteRule({{ rule.id }})"
+            class="px-3 py-1.5 rounded text-xs font-medium bg-red-900/20 text-red-400 hover:bg-red-900/40 transition whitespace-nowrap">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Body: Conditions | Actions ── -->
+    <div class="grid grid-cols-2 gap-6 pl-7 mb-4">
+      <!-- Conditions -->
+      <div>
+        <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Conditions</p>
+        <div class="space-y-1 text-sm text-slate-400">
+          <div>Unwatched ≥ <strong class="text-white">{{ rule.condition_days_unwatched }}</strong> days</div>
+          {% if rule.condition_watch_status %}
+          <div>Status: <strong class="text-white">{{ rule.condition_watch_status | replace('_',' ') | title }}</strong></div>
+          {% endif %}
+          {% if rule.condition_min_size_gb %}
+          <div>Min size: <strong class="text-white">{{ rule.condition_min_size_gb }} GB</strong></div>
+          {% endif %}
+          {% if rule.condition_max_size_gb %}
+          <div>Max size: <strong class="text-white">{{ rule.condition_max_size_gb }} GB</strong></div>
+          {% endif %}
+          {% if rule.condition_resolution %}
+          {% set res_display = rule.condition_resolution | replace('[','') | replace(']','') | replace('"','') | trim %}
+          <div>Resolution: <strong class="text-white">{{ res_display }}</strong></div>
+          {% endif %}
+          {% if rule.condition_genres %}
+          {% set genres_display = rule.condition_genres | replace('[','') | replace(']','') | replace('"','') | trim %}
+          <div>Genres: <strong class="text-white">{{ genres_display }}</strong></div>
+          {% endif %}
+          {% if rule.condition_tags %}
+          {% set tags_display = rule.condition_tags | replace('[','') | replace(']','') | replace('"','') | trim %}
+          <div>Tags: <strong class="text-white">{{ tags_display }}</strong></div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Actions performed -->
+      <div>
+        <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Actions</p>
+        <div class="space-y-1.5 text-sm">
+          {% if rule.action_unmonitor_arr %}
+          <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0"></span><span class="text-sky-300">Unmonitor</span></div>
+          {% endif %}
+          {% if rule.action_delete_from_arr %}
+          <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-orange-400 flex-shrink-0"></span><span class="text-orange-300">Remove from Sonarr/Radarr</span></div>
+          {% endif %}
+          {% if rule.action_delete_torrent %}
+          <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-yellow-400 flex-shrink-0"></span><span class="text-yellow-300">Delete torrent</span></div>
+          {% endif %}
+          {% if rule.action_delete_files %}
+          <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0"></span><span class="text-red-300">Delete files from disk</span></div>
+          {% endif %}
+          {% if rule.action_delete_from_media_server %}
+          <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0"></span><span class="text-red-300">Delete via media server</span></div>
+          {% endif %}
+          {% if not rule.action_unmonitor_arr and not rule.action_delete_from_arr and not rule.action_delete_torrent and not rule.action_delete_files and not rule.action_delete_from_media_server %}
+          <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 flex-shrink-0"></span><span class="text-slate-500">No action configured</span></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Footer: meta + order ── -->
+    <div class="flex items-center justify-between pl-7 pt-3 border-t border-slate-700/30">
+      <span class="text-xs text-slate-500">
+        Created {{ rule.created_at.strftime('%Y-%m-%d') }}
+        {% if rule.last_run %}· Last run {{ rule.last_run.strftime('%Y-%m-%d %H:%M') }}{% endif %}
+      </span>
+      <div class="flex items-center gap-1">
+        <span class="text-xs text-slate-600 mr-1">Order:</span>
+        <button hx-post="/rules/{{ rule.id }}/move" hx-vals='{"direction":"up"}' hx-target="#rules-list" hx-swap="innerHTML"
+          class="px-2 py-1 rounded text-xs text-slate-500 hover:text-white hover:bg-slate-700/50 transition" title="Move up">↑</button>
+        <button hx-post="/rules/{{ rule.id }}/move" hx-vals='{"direction":"down"}' hx-target="#rules-list" hx-swap="innerHTML"
+          class="px-2 py-1 rounded text-xs text-slate-500 hover:text-white hover:bg-slate-700/50 transition" title="Move down">↓</button>
+      </div>
+    </div>
+
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-16 text-slate-500">
+  <svg class="w-12 h-12 mx-auto mb-3 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+  </svg>
+  <p class="font-medium">No rules yet</p>
+  <p class="text-sm mt-1">Click <strong class="text-[#e5a00d]">+ New Rule</strong> above to get started.</p>
+</div>
+{% endif %}

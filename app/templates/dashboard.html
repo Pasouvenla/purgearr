@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Purgearr{% endblock %}
+
+{% block nav_extra %}
+<button id="dash-sync-btn"
+  hx-post="/library/sync"
+  hx-swap="none"
+  hx-indicator="#dash-sync-spinner"
+  onclick="handleDashSync()"
+  class="px-3 py-1.5 rounded text-sm font-medium bg-[#e5a00d]/10 text-[#e5a00d] hover:bg-[#e5a00d]/20 border border-[#e5a00d]/30 transition flex items-center gap-1.5">
+  <svg id="dash-sync-spinner" class="htmx-indicator w-3.5 h-3.5 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+  </svg>
+  <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+  </svg>
+  <span class="hidden sm:inline">Sync</span>
+</button>
+{% endblock %}
+
+{% block page_body %}
+<main class="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
+  <h2 class="text-2xl font-bold text-white mb-6">Dashboard</h2>
+
+  <!-- Top Stat Cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-5">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Total Items</p>
+      <p class="text-3xl font-bold text-white">{{ total_items }}</p>
+      <p class="text-xs text-slate-400 mt-1">{{ total_movies }} movies · {{ total_series }} series</p>
+    </div>
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-5">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Total Size</p>
+      <p class="text-3xl font-bold text-white">{{ total_size_gb }} <span class="text-lg text-slate-400">GB</span></p>
+      <p class="text-xs text-slate-400 mt-1">{{ (total_size_gb / 1024) | round(2) }} TB total</p>
+    </div>
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-5">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Unwatched</p>
+      <p class="text-3xl font-bold text-[#e5a00d]">{{ unwatched_count }}</p>
+      <p class="text-xs text-slate-400 mt-1">{{ unwatched_size_gb }} GB unused</p>
+    </div>
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-5">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Never Watched</p>
+      <p class="text-3xl font-bold text-red-400">{{ never_watched_count }}</p>
+      <p class="text-xs text-slate-400 mt-1">{{ never_watched_size_gb }} GB wasted</p>
+    </div>
+  </div>
+
+  <!-- Secondary Stat Row -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-5 flex items-center gap-4">
+      <div class="w-12 h-12 rounded-full bg-orange-900/30 flex items-center justify-center flex-shrink-0">
+        <svg class="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="text-xs text-slate-500 uppercase tracking-wider">Stale (90+ days)</p>
+        <p class="text-2xl font-bold text-orange-400">{{ stale_90_count }} items</p>
+        <p class="text-xs text-slate-400">{{ stale_90_size_gb }} GB not watched in 90+ days</p>
+      </div>
+    </div>
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-5 flex items-center gap-4">
+      <div class="w-12 h-12 rounded-full bg-[#e5a00d]/10 flex items-center justify-center flex-shrink-0">
+        <svg class="w-6 h-6 text-[#e5a00d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7h16M10 11v6M14 11v6M9 4h6"/>
+        </svg>
+      </div>
+      <div>
+        <p class="text-xs text-slate-500 uppercase tracking-wider">Potential Savings</p>
+        <p class="text-2xl font-bold text-[#e5a00d]">{{ never_watched_size_gb }} GB</p>
+        <p class="text-xs text-slate-400">If all never-watched content were removed</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+    <!-- Resolution Breakdown -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6">
+      <h3 class="text-base font-semibold text-white mb-4">Resolution Breakdown</h3>
+      {% if resolution_bars %}
+      <div class="space-y-3">
+        {% for bar in resolution_bars %}
+        {% if bar.count > 0 %}
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm text-slate-300 font-medium">{{ bar.label }}</span>
+            <span class="text-xs text-slate-400">{{ bar.count }} items · {{ bar.size_gb }} GB ({{ bar.pct }}%)</span>
+          </div>
+          <div class="w-full bg-[#0f0f1a] rounded-full h-2">
+            <div class="h-2 rounded-full
+              {% if bar.label == '4K' %}bg-purple-500
+              {% elif bar.label == '1080P' %}bg-blue-500
+              {% elif bar.label == '720P' %}bg-teal-500
+              {% else %}bg-slate-500{% endif %}"
+              style="width: {{ bar.pct }}%"></div>
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-slate-500 text-sm">No data — sync your library first.</p>
+      {% endif %}
+    </div>
+
+    <!-- Codec Breakdown -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6">
+      <h3 class="text-base font-semibold text-white mb-4">Video Codec Breakdown</h3>
+      {% if codec_bars %}
+      <div class="space-y-3">
+        {% for bar in codec_bars %}
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm text-slate-300 font-medium">{{ bar.label }}</span>
+            <span class="text-xs text-slate-400">{{ bar.count }} items ({{ bar.pct }}%)</span>
+          </div>
+          <div class="w-full bg-[#0f0f1a] rounded-full h-2">
+            <div class="h-2 rounded-full bg-[#e5a00d]" style="width: {{ bar.pct }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-slate-500 text-sm">No data — sync your library first.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Most Stale Content -->
+  <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-8">
+    <h3 class="text-base font-semibold text-white mb-1">Most Stale Content</h3>
+    <p class="text-xs text-slate-500 mb-4">Largest items never or rarely watched, sorted by staleness then size.</p>
+    {% if most_stale %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left border-b border-slate-700/50">
+            <th class="pb-2.5 text-xs text-slate-500 font-medium uppercase tracking-wider">Title</th>
+            <th class="pb-2.5 text-xs text-slate-500 font-medium uppercase tracking-wider">Type</th>
+            <th class="pb-2.5 text-xs text-slate-500 font-medium uppercase tracking-wider">Size</th>
+            <th class="pb-2.5 text-xs text-slate-500 font-medium uppercase tracking-wider">Last Watched</th>
+            <th class="pb-2.5 text-xs text-slate-500 font-medium uppercase tracking-wider">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700/30">
+          {% for item in most_stale %}
+          {% set size_gb = (item.file_size_bytes / 1073741824) | round(1) if item.file_size_bytes else 0 %}
+          <tr data-item-id="{{ item.id }}" class="hover:bg-[#16213e]/40 transition">
+            <td class="py-2.5 pr-4">
+              <span class="text-white font-medium">{{ item.title }}</span>
+              {% if item.year %}<span class="text-slate-500 text-xs ml-1">({{ item.year }})</span>{% endif %}
+            </td>
+            <td class="py-2.5 pr-4">
+              <span class="px-1.5 py-0.5 rounded text-xs
+                {% if item.media_type == 'movie' %}bg-[#e5a00d]/20 text-[#e5a00d]{% else %}bg-sky-900/40 text-sky-300{% endif %}">
+                {{ 'Movie' if item.media_type == 'movie' else 'Series' }}
+              </span>
+            </td>
+            <td class="py-2.5 pr-4 text-slate-300">{{ size_gb }} GB</td>
+            <td class="py-2.5 pr-4">
+              {% if item.last_watched %}
+              <span class="text-orange-400">{{ item.last_watched.strftime('%Y-%m-%d') }}</span>
+              {% else %}
+              <span class="text-red-400 font-medium">Never</span>
+              {% endif %}
+            </td>
+            <td class="py-2.5">
+              <button onclick="openDeleteModalSingle({{ item.id }}, '{{ item.title | replace("'", "\\'") }}')"
+                class="px-2.5 py-1 rounded text-xs font-medium bg-red-900/30 text-red-300 border border-red-700/40 hover:bg-red-900/50 transition">
+                Delete
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-slate-500 text-sm">No items found. Sync your library to see data.</p>
+    {% endif %}
+  </div>
+
+  <!-- Recently Added -->
+  <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6">
+    <h3 class="text-base font-semibold text-white mb-4">Recently Added</h3>
+    {% if recently_added %}
+    <div class="divide-y divide-slate-700/30">
+      {% for item in recently_added %}
+      {% set size_gb = (item.file_size_bytes / 1073741824) | round(1) if item.file_size_bytes else 0 %}
+      <div class="flex items-center justify-between py-2.5">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="px-1.5 py-0.5 rounded text-xs flex-shrink-0
+            {% if item.media_type == 'movie' %}bg-[#e5a00d]/20 text-[#e5a00d]{% else %}bg-sky-900/40 text-sky-300{% endif %}">
+            {{ 'M' if item.media_type == 'movie' else 'S' }}
+          </span>
+          <span class="text-sm text-white truncate">{{ item.title }}</span>
+          {% if item.year %}<span class="text-slate-500 text-xs flex-shrink-0">({{ item.year }})</span>{% endif %}
+        </div>
+        <div class="flex items-center gap-4 flex-shrink-0 ml-4">
+          <span class="text-xs text-slate-400">{{ size_gb }} GB</span>
+          {% if item.date_added %}
+          <span class="text-xs text-slate-500">{{ item.date_added.strftime('%Y-%m-%d') }}</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-slate-500 text-sm">No items found. Sync your library to see data.</p>
+    {% endif %}
+  </div>
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function handleDashSync() {
+  document.getElementById('dash-sync-btn').addEventListener('htmx:afterRequest', function(e) {
+    const xhr = e.detail.xhr;
+
+    // htmx fires afterRequest whatever came back, including when nothing from
+    // this application answered at all. Anything unreadable used to fall into a
+    // catch that said "Sync complete.", so a sync that never ran reported
+    // success. Each case now gets its own message, and only a real one reloads.
+    if (!xhr || !xhr.status) {
+      showToast('Sync failed: the server could not be reached.', true);
+      return;
+    }
+
+    let data = null;
+    try {
+      data = JSON.parse(xhr.responseText);
+    } catch {
+      data = null;
+    }
+
+    // A 2xx carrying something other than JSON means the request was answered
+    // before it reached Purgearr: a reverse proxy bot-protection challenge, a
+    // sign-in page, an error page. The 302 such a challenge returns makes the
+    // browser replay a POST as a GET, so the body is lost and the sync never
+    // starts.
+    if (data === null) {
+      showToast(
+        'Sync did not run: the answer came back as ' + xhr.status +
+        ' without JSON, so something replied instead of Purgearr. If a reverse ' +
+        'proxy sits in front, its session has probably expired: reload the page ' +
+        'and try again.', true);
+      return;
+    }
+
+    if (xhr.status === 429) {
+      showToast('Sync refused: too many attempts, this route allows 5 per minute. Wait a moment.', true);
+      return;
+    }
+    if (xhr.status === 401) {
+      showToast('Sync refused: your session has expired. Sign in again.', true);
+      return;
+    }
+    if (xhr.status < 200 || xhr.status >= 300 || data.status !== 'ok') {
+      showToast('Sync failed: ' + (data.message || data.error || 'the server returned ' + xhr.status) + '.', true);
+      return;
+    }
+
+    showToast(`Sync complete: +${data.added} added, ${data.updated} updated, ${data.removed} removed`);
+    setTimeout(() => location.reload(), 1000);
+  }, { once: true });
+}
+</script>
+{% endblock %}

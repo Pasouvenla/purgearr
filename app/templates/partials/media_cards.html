@@ -1,0 +1,136 @@
+{% if request.headers.get('hx-request') %}
+<span id="results-count" hx-swap-oob="true" class="text-slate-400 text-sm">
+  {% if total_results is defined and total_results > 0 %}
+    Showing {{ start_item }}–{{ end_item }} of {{ total_results }} results
+  {% else %}
+    0 results
+  {% endif %}
+</span>
+{% endif %}
+
+{% if items %}
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" id="media-cards-inner">
+  {% for item in items %}
+  {% set size_gb = (item.file_size_bytes / 1073741824) | round(1) if item.file_size_bytes else 0 %}
+  <div class="media-card bg-[#1a1a2e] rounded-xl overflow-hidden border border-slate-700/30 hover:border-[#e5a00d]/40 transition-all duration-200 cursor-pointer relative group"
+       onclick="openDetail({{ item.id }}, event)">
+
+    <!-- Checkbox -->
+    <div class="card-checkbox absolute top-2 left-2 z-10" id="cb-wrap-{{ item.id }}">
+      <input type="checkbox" id="cb-{{ item.id }}" value="{{ item.id }}"
+        class="w-4 h-4 accent-[#e5a00d] rounded cursor-pointer"
+        onclick="event.stopPropagation(); toggleSelect({{ item.id }})" />
+    </div>
+
+    <!-- Poster -->
+    <div class="aspect-[2/3] bg-[#0f0f1a] relative overflow-hidden">
+      {% if item.poster_url %}
+      <img src="{{ item.poster_url }}" alt="{{ item.title }}" loading="lazy"
+           class="w-full h-full object-cover"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'" />
+      {% endif %}
+      <div class="{% if item.poster_url %}hidden{% endif %} w-full h-full flex items-center justify-center text-slate-600">
+        <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M4 4h16v16H4V4zm2 2v12h12V6H6z"/>
+        </svg>
+      </div>
+
+      <!-- Resolution badge -->
+      {% if item.resolution %}
+      <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-xs font-bold
+        {% if item.resolution == '4k' %}bg-purple-700 text-purple-100
+        {% elif item.resolution == '1080p' %}bg-blue-700 text-blue-100
+        {% elif item.resolution == '720p' %}bg-teal-700 text-teal-100
+        {% else %}bg-slate-600 text-slate-200{% endif %}">
+        {{ item.resolution | upper }}
+      </span>
+      {% endif %}
+
+      <!-- Type badge -->
+      <span class="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-xs font-medium
+        {% if item.media_type == 'movie' %}bg-[#e5a00d]/20 text-[#e5a00d]{% else %}bg-sky-900/60 text-sky-300{% endif %}">
+        {{ 'Movie' if item.media_type == 'movie' else 'Series' }}
+      </span>
+    </div>
+
+    <!-- Info -->
+    <div class="p-3">
+      <h3 class="text-sm font-semibold text-white truncate leading-tight" title="{{ item.title }}">{{ item.title }}</h3>
+      <p class="text-xs text-slate-400 mt-0.5">{{ item.year or '—' }}</p>
+
+      <div class="mt-2 flex items-center justify-between">
+        {% if size_gb > 0 %}
+        <span class="text-xs text-slate-400">{{ size_gb }} GB</span>
+        {% else %}
+        <span class="text-xs text-slate-600">—</span>
+        {% endif %}
+
+        {% if item.watch_status == 'watched' %}
+        <span class="text-xs text-green-400 flex items-center gap-0.5">
+          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+          Watched
+        </span>
+        {% elif item.watch_status == 'in_progress' %}
+        <span class="text-xs text-blue-400">{{ item.watch_progress | int }}%</span>
+        {% else %}
+        <span class="text-xs text-[#e5a00d] font-medium">Never watched</span>
+        {% endif %}
+      </div>
+
+      {% if item.last_watched %}
+      <p class="text-xs text-slate-500 mt-1 truncate">
+        {{ item.last_watched.strftime('%Y-%m-%d') }}
+      </p>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="flex flex-col items-center justify-center py-24 text-center">
+  <svg class="w-16 h-16 text-slate-700 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"/>
+  </svg>
+  <p class="text-slate-400 text-lg font-medium">No items found</p>
+  <p class="text-slate-500 text-sm mt-1">Try adjusting your filters or sync your library.</p>
+  <a href="/library" class="mt-4 text-sm text-[#e5a00d] hover:underline">Clear filters</a>
+</div>
+{% endif %}
+
+{% if total_results is defined and total_results > 0 %}
+<!-- Pagination -->
+<div class="mt-6 flex items-center justify-between border-t border-slate-700/30 pt-4">
+  <span class="text-sm text-slate-400">
+    Showing {{ start_item }}–{{ end_item }} of {{ total_results }} results
+  </span>
+  <div class="flex items-center gap-2">
+    {% if page > 1 %}
+    <button
+      hx-get="/library/items"
+      hx-target="#media-grid"
+      hx-vals='{"page": "{{ page - 1 }}"{% for k, v in params.items() %}{% if k != "page" %}, "{{ k }}": "{{ v }}"{% endif %}{% endfor %}}'
+      hx-push-url="true"
+      class="px-3 py-1.5 rounded text-sm text-slate-300 border border-slate-600 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+      ← Previous
+    </button>
+    {% else %}
+    <span class="px-3 py-1.5 rounded text-sm text-slate-600 border border-slate-700/30 cursor-not-allowed">← Previous</span>
+    {% endif %}
+
+    <span class="text-sm text-slate-400 px-2">Page {{ page }} of {{ total_pages }}</span>
+
+    {% if page < total_pages %}
+    <button
+      hx-get="/library/items"
+      hx-target="#media-grid"
+      hx-vals='{"page": "{{ page + 1 }}"{% for k, v in params.items() %}{% if k != "page" %}, "{{ k }}": "{{ v }}"{% endif %}{% endfor %}}'
+      hx-push-url="true"
+      class="px-3 py-1.5 rounded text-sm text-slate-300 border border-slate-600 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+      Next →
+    </button>
+    {% else %}
+    <span class="px-3 py-1.5 rounded text-sm text-slate-600 border border-slate-700/30 cursor-not-allowed">Next →</span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+{% block title %}Settings — Purgearr{% endblock %}
+
+{% block page_body %}
+<main class="flex-1 max-w-4xl mx-auto w-full px-6 py-8">
+  <h2 class="text-2xl font-bold text-white mb-6">Settings</h2>
+
+  {% if saved %}
+  <div class="mb-6 px-4 py-3 rounded-lg bg-green-900/40 border border-green-700/50 text-green-300 text-sm">
+    Settings saved successfully.
+  </div>
+  {% endif %}
+
+  <form method="post" action="/settings">
+
+    <!-- Media Server -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <h3 class="text-base font-semibold text-white mb-4">Active Media Server</h3>
+      <div class="flex gap-4">
+        {% for val, label in [('plex', 'Plex'), ('jellyfin', 'Jellyfin'), ('both', 'Both')] %}
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="radio" name="active_media_server" value="{{ val }}"
+            {% if settings.get('active_media_server', 'plex') == val %}checked{% endif %}
+            class="accent-[#e5a00d]" />
+          <span class="text-sm text-slate-300">{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Plex -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold text-white">Plex</h3>
+        <button type="button"
+          hx-post="/settings/test/plex"
+          hx-target="#test-plex"
+          hx-include="[name='plex_url'],[name='plex_token']"
+          class="text-xs px-3 py-1.5 rounded border border-slate-600 text-slate-300 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+          Test Connection
+        </button>
+      </div>
+      <div id="test-plex" class="mb-3 min-h-[20px]"></div>
+      <div class="grid gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Plex URL</label>
+          <input type="url" name="plex_url" value="{{ settings.get('plex_url','') }}" placeholder="http://192.168.1.x:32400"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Plex Token</label>
+          <input type="password" name="plex_token" value="{{ settings.get('plex_token','') }}" placeholder="X-Plex-Token"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Jellyfin -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold text-white">Jellyfin</h3>
+        <button type="button"
+          hx-post="/settings/test/jellyfin"
+          hx-target="#test-jellyfin"
+          hx-include="[name='jellyfin_url'],[name='jellyfin_token']"
+          class="text-xs px-3 py-1.5 rounded border border-slate-600 text-slate-300 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+          Test Connection
+        </button>
+      </div>
+      <div id="test-jellyfin" class="mb-3 min-h-[20px]"></div>
+      <div class="grid gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Jellyfin URL</label>
+          <input type="url" name="jellyfin_url" value="{{ settings.get('jellyfin_url','') }}" placeholder="http://192.168.1.x:8096"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">API Token</label>
+          <input type="password" name="jellyfin_token" value="{{ settings.get('jellyfin_token','') }}" placeholder="X-Emby-Token"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Sonarr -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold text-white">Sonarr</h3>
+        <button type="button"
+          hx-post="/settings/test/sonarr"
+          hx-target="#test-sonarr"
+          hx-include="[name='sonarr_url'],[name='sonarr_api_key']"
+          class="text-xs px-3 py-1.5 rounded border border-slate-600 text-slate-300 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+          Test Connection
+        </button>
+      </div>
+      <div id="test-sonarr" class="mb-3 min-h-[20px]"></div>
+      <div class="grid gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Sonarr URL</label>
+          <input type="url" name="sonarr_url" value="{{ settings.get('sonarr_url','') }}" placeholder="http://192.168.1.x:8989"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">API Key</label>
+          <input type="password" name="sonarr_api_key" value="{{ settings.get('sonarr_api_key','') }}"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Radarr -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold text-white">Radarr</h3>
+        <button type="button"
+          hx-post="/settings/test/radarr"
+          hx-target="#test-radarr"
+          hx-include="[name='radarr_url'],[name='radarr_api_key']"
+          class="text-xs px-3 py-1.5 rounded border border-slate-600 text-slate-300 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+          Test Connection
+        </button>
+      </div>
+      <div id="test-radarr" class="mb-3 min-h-[20px]"></div>
+      <div class="grid gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Radarr URL</label>
+          <input type="url" name="radarr_url" value="{{ settings.get('radarr_url','') }}" placeholder="http://192.168.1.x:7878"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">API Key</label>
+          <input type="password" name="radarr_api_key" value="{{ settings.get('radarr_api_key','') }}"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+      </div>
+    </div>
+
+    <!-- qBittorrent -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold text-white">qBittorrent</h3>
+        <button type="button"
+          hx-post="/settings/test/qbittorrent"
+          hx-target="#test-qbit"
+          hx-include="[name='qbit_url'],[name='qbit_api_key'],[name='qbit_instance_id']"
+          class="text-xs px-3 py-1.5 rounded border border-slate-600 text-slate-300 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+          Test Connection
+        </button>
+      </div>
+      <div id="test-qbit" class="mb-3 min-h-[20px]"></div>
+      <div class="grid gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">QUI URL</label>
+          <input type="url" name="qbit_url" value="{{ settings.get('qbit_url','') }}" placeholder="https://yourbox.usbx.me/qui"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">API Key <span class="text-slate-500">(QUI Settings → API Keys)</span></label>
+          <input type="password" name="qbit_api_key" value="{{ settings.get('qbit_api_key','') }}"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Instance ID <span class="text-slate-500">(default: 1)</span></label>
+          <input type="number" name="qbit_instance_id" value="{{ settings.get('qbit_instance_id','1') }}" min="1"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+      </div>
+    </div>
+
+    <!-- TMDB -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold text-white">TMDB <span class="text-slate-500 text-sm font-normal">— Streaming Providers</span></h3>
+        <button type="button"
+          hx-post="/settings/test/tmdb"
+          hx-target="#test-tmdb"
+          hx-include="[name='tmdb_api_key']"
+          class="text-xs px-3 py-1.5 rounded border border-slate-600 text-slate-300 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+          Test Connection
+        </button>
+      </div>
+      <div id="test-tmdb" class="mb-3 min-h-[20px]"></div>
+      <div class="grid gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">API Key (v3)</label>
+          <input type="password" name="tmdb_api_key" value="{{ settings.get('tmdb_api_key','') }}"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Country <span class="text-slate-500">(streaming region)</span></label>
+          <select name="tmdb_country" class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white focus:outline-none focus:border-[#e5a00d] transition">
+            {% set current_country = settings.get('tmdb_country', 'FR') %}
+            {% for code, name in [('FR','France'),('US','United States'),('GB','United Kingdom'),('DE','Germany'),('ES','Spain'),('IT','Italy'),('CA','Canada'),('AU','Australia'),('JP','Japan'),('BE','Belgium'),('NL','Netherlands'),('CH','Switzerland')] %}
+            <option value="{{ code }}" {% if current_country == code %}selected{% endif %}>{{ name }} ({{ code }})</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seerr -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-base font-semibold text-white">Seerr</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Overseerr or Jellyseerr — same API</p>
+        </div>
+        <button type="button"
+          hx-post="/settings/test/seerr"
+          hx-target="#test-seerr"
+          hx-include="[name='seerr_url'],[name='seerr_api_key']"
+          class="text-xs px-3 py-1.5 rounded border border-slate-600 text-slate-300 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+          Test Connection
+        </button>
+      </div>
+      <div id="test-seerr" class="mb-3 min-h-[20px]"></div>
+      <div class="grid gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Seerr URL</label>
+          <input type="url" name="seerr_url" value="{{ settings.get('seerr_url','') }}" placeholder="http://192.168.1.x:5055"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">API Key</label>
+          <input type="password" name="seerr_api_key" value="{{ settings.get('seerr_api_key','') }}"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-base font-semibold text-white">Notifications</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Get notified when rules run or syncs complete</p>
+        </div>
+        <button type="button"
+          hx-post="/settings/test/notifier"
+          hx-target="#test-notifier"
+          hx-include="[name='notifier_type'],[name='notifier_url'],[name='notifier_token']"
+          class="text-xs px-3 py-1.5 rounded border border-slate-600 text-slate-300 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+          Send Test
+        </button>
+      </div>
+      <div id="test-notifier" class="mb-3 min-h-[20px]"></div>
+      <div class="grid gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Notification Service</label>
+          <select name="notifier_type" class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white focus:outline-none focus:border-[#e5a00d] transition">
+            {% for val, label in [('none', 'Disabled'), ('ntfy', 'ntfy'), ('gotify', 'Gotify'), ('discord', 'Discord'), ('apprise', 'Apprise')] %}
+            <option value="{{ val }}" {% if settings.get('notifier_type', 'none') == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">
+            URL
+            <span class="text-slate-500 font-normal">(ntfy: topic URL · Gotify: server base URL · Discord: webhook URL · Apprise: API base URL)</span>
+          </label>
+          <input type="url" name="notifier_url" value="{{ settings.get('notifier_url','') }}" placeholder="https://ntfy.sh/my-topic"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Token / API Key <span class="text-slate-500 font-normal">(ntfy: optional · Gotify: required · Discord/Apprise: leave blank)</span></label>
+          <input type="password" name="notifier_token" value="{{ settings.get('notifier_token','') }}"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Tautulli -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-base font-semibold text-white">Tautulli</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Enriches Plex watch history with more accurate data</p>
+        </div>
+        <button type="button"
+          hx-post="/settings/test/tautulli"
+          hx-target="#test-tautulli"
+          hx-include="[name='tautulli_url'],[name='tautulli_api_key']"
+          class="text-xs px-3 py-1.5 rounded border border-slate-600 text-slate-300 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+          Test Connection
+        </button>
+      </div>
+      <div id="test-tautulli" class="mb-3 min-h-[20px]"></div>
+      <div class="grid gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Tautulli URL</label>
+          <input type="url" name="tautulli_url" value="{{ settings.get('tautulli_url','') }}" placeholder="http://192.168.1.x:8181"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">API Key</label>
+          <input type="password" name="tautulli_api_key" value="{{ settings.get('tautulli_api_key','') }}"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Outgoing Webhooks -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-base font-semibold text-white">Outgoing Webhooks</h3>
+          <p class="text-xs text-slate-500 mt-0.5">POST events to an external URL on rule execution, deletion, or sync</p>
+        </div>
+        <button type="button"
+          hx-post="/settings/test/webhook"
+          hx-target="#test-webhook"
+          hx-include="[name='webhook_url'],[name='webhook_secret']"
+          class="text-xs px-3 py-1.5 rounded border border-slate-600 text-slate-300 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+          Send Test
+        </button>
+      </div>
+      <div id="test-webhook" class="mb-3 min-h-[20px]"></div>
+      <div class="grid gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Webhook URL</label>
+          <input type="url" name="webhook_url" value="{{ settings.get('webhook_url','') }}" placeholder="https://your-service.example.com/webhook"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">
+            Secret
+            <span class="text-slate-500 font-normal">(optional — used to sign payload with HMAC-SHA256 via X-Purgearr-Signature header)</span>
+          </label>
+          <input type="password" name="webhook_secret" value="{{ settings.get('webhook_secret','') }}"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-[#e5a00d] transition" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Library Sync -->
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+      <h3 class="text-base font-semibold text-white mb-4">Library Sync</h3>
+      <div class="flex items-end gap-4">
+        <div class="flex-1">
+          <label class="block text-sm text-slate-400 mb-1">Auto-sync interval</label>
+          <select name="sync_interval_hours"
+            class="w-full px-3 py-2 text-sm rounded-lg bg-[#0f0f1a] border border-slate-600 text-white focus:outline-none focus:border-[#e5a00d] transition">
+            {% for val, label in [('0', 'Disabled'), ('1', 'Every hour'), ('6', 'Every 6 hours'), ('12', 'Every 12 hours'), ('24', 'Every 24 hours')] %}
+            <option value="{{ val }}" {% if settings.get('sync_interval_hours', '0') == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="button"
+          hx-post="/settings/reschedule-sync"
+          hx-target="#reschedule-result"
+          hx-include="[name='sync_interval_hours']"
+          class="px-4 py-2 rounded-lg text-sm border border-slate-600 text-slate-300 hover:border-[#e5a00d] hover:text-[#e5a00d] transition">
+          Apply Now
+        </button>
+      </div>
+      <div id="reschedule-result" class="mt-2 min-h-[20px]"></div>
+    </div>
+
+    <!-- Save -->
+    <div class="flex justify-end mb-8">
+      <button type="submit"
+        class="px-6 py-2.5 rounded-lg bg-[#e5a00d] hover:bg-[#f5b01d] text-black font-semibold transition">
+        Save Settings
+      </button>
+    </div>
+
+  </form>
+
+  <!-- Backup & Restore (separate form — file upload) -->
+  <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-6 mb-6">
+    <h3 class="text-base font-semibold text-white mb-2">Backup & Restore</h3>
+    <p class="text-sm text-slate-400 mb-5">Export all settings to a JSON file, or import a previously exported config.</p>
+    <div class="flex flex-wrap gap-4 items-center">
+      <a href="/settings/export"
+        class="px-4 py-2 rounded-lg text-sm font-medium bg-[#16213e] text-[#e5a00d] border border-[#e5a00d]/30 hover:bg-[#e5a00d]/10 transition">
+        Export Config
+      </a>
+      <form method="post" action="/settings/import" enctype="multipart/form-data" class="flex items-center gap-3">
+        <label class="block">
+          <span class="sr-only">Import config file</span>
+          <input type="file" name="file" accept=".json"
+            class="text-sm text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-slate-600 file:text-sm file:text-slate-300 file:bg-[#0f0f1a] hover:file:border-[#e5a00d] hover:file:text-[#e5a00d] transition" />
+        </label>
+        <button type="submit"
+          class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-white transition">
+          Import
+        </button>
+      </form>
+    </div>
+  </div>
+
+</main>
+{% endblock %}

@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Duplicates — Purgearr{% endblock %}
+
+{% block page_body %}
+<main class="flex-1 max-w-4xl mx-auto w-full px-6 py-8">
+
+  <div class="flex items-start justify-between mb-6 gap-4">
+    <div>
+      <h2 class="text-2xl font-bold text-white">Duplicate Detection</h2>
+      <p class="text-slate-400 text-sm mt-1">Items sharing the same TMDB ID — likely the same content indexed twice.</p>
+    </div>
+    {% if groups %}
+    <div class="flex-shrink-0 text-right">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Potential waste</p>
+      <p class="text-xl font-bold text-[#e5a00d]">{{ total_wasted_gb | round(1) }} GB</p>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if groups %}
+  <div class="flex items-center gap-3 mb-4">
+    <button onclick="toggleSelectAll()" id="select-all-btn"
+      class="text-xs text-slate-400 hover:text-[#e5a00d] transition">
+      Select all
+    </button>
+  </div>
+  <div id="batch-toolbar" class="hidden mb-4 flex items-center gap-3 p-3 bg-[#16213e] rounded-lg border border-slate-700/50">
+    <span id="batch-count" class="text-sm text-slate-300">0 selected</span>
+    <button onclick="resolveSelected()"
+      class="px-4 py-1.5 rounded text-sm font-medium bg-[#e5a00d] hover:bg-[#f5b01d] text-black transition">
+      Resolve Selected
+    </button>
+    <button onclick="clearDupSelection()" class="px-3 py-1.5 rounded text-sm text-slate-400 hover:text-white transition">Clear</button>
+  </div>
+  {% endif %}
+
+  {% if not groups %}
+  <div class="text-center py-20 text-slate-500">
+    <svg class="w-14 h-14 mx-auto mb-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <p class="font-medium text-lg">No duplicates found</p>
+    <p class="text-sm mt-1">All items have unique TMDB IDs.</p>
+  </div>
+  {% else %}
+  <div class="space-y-5">
+    {% for group in groups %}
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 overflow-hidden">
+      <!-- Group header -->
+      <div class="px-5 py-3 bg-[#16213e] border-b border-slate-700/50 flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-2 min-w-0">
+          <input type="checkbox" class="dup-group-cb w-4 h-4 accent-[#e5a00d] flex-shrink-0"
+            data-tmdb="{{ group.tmdb_id }}" onchange="updateBatchToolbar()" />
+          <span class="px-2 py-0.5 rounded text-xs font-medium flex-shrink-0
+            {% if group.media_type == 'movie' %}bg-[#e5a00d]/20 text-[#e5a00d]{% else %}bg-sky-900/40 text-sky-300{% endif %}">
+            {{ 'Movie' if group.media_type == 'movie' else 'Series' }}
+          </span>
+          <h4 class="text-sm font-semibold text-white truncate">{{ group.title }}</h4>
+          {% if group.tmdb_id %}
+          <a href="https://www.themoviedb.org/{{ 'movie' if group.media_type == 'movie' else 'tv' }}/{{ group.tmdb_id }}"
+             target="_blank" rel="noopener"
+             class="text-xs text-[#e5a00d] hover:underline flex-shrink-0">TMDB #{{ group.tmdb_id }}</a>
+          {% endif %}
+        </div>
+        <div class="flex items-center gap-3 flex-shrink-0">
+          <span class="text-xs text-slate-400">{{ group.copies | length }} copies · {{ group.total_size_gb | round(2) }} GB</span>
+          <button onclick="resolveGroup({{ group.tmdb_id }}, this)"
+            class="px-3 py-1.5 rounded text-xs font-medium bg-[#e5a00d]/10 text-[#e5a00d] border border-[#e5a00d]/30 hover:bg-[#e5a00d]/20 transition">
+            Keep Best
+          </button>
+        </div>
+      </div>
+      <!-- Items -->
+      <div id="dup-group-{{ group.tmdb_id }}" class="divide-y divide-slate-700/30">
+        {% for item in group.copies %}
+        <div class="px-5 py-3 flex items-center gap-4 {% if item.id == group.best_id %}bg-green-900/10{% endif %}">
+          {% if item.poster_url %}
+          <img src="{{ item.poster_url }}" alt="" class="w-8 h-12 object-cover rounded flex-shrink-0 opacity-70" onerror="this.style.display='none'" />
+          {% endif %}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <p class="text-sm text-white font-medium truncate">{{ item.title }}{% if item.year %} <span class="text-slate-500 font-normal">({{ item.year }})</span>{% endif %}</p>
+              {% if item.id == group.best_id %}
+              <span class="px-1.5 py-0.5 rounded text-xs bg-green-900/40 text-green-400 flex-shrink-0">Best</span>
+              {% endif %}
+            </div>
+            <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-slate-400">
+              <span>{{ item.source | capitalize }}</span>
+              {% if item.resolution %}<span class="font-mono">{{ item.resolution | upper }}</span>{% endif %}
+              {% if item.file_size_bytes %}<span>{{ (item.file_size_bytes / 1073741824) | round(2) }} GB</span>{% endif %}
+              <span class="{% if item.watch_status == 'watched' %}text-green-400{% elif item.watch_status == 'in_progress' %}text-blue-400{% else %}text-[#e5a00d]{% endif %}">
+                {% if item.watch_status == 'watched' %}Watched{% elif item.watch_status == 'in_progress' %}In Progress{% else %}Unwatched{% endif %}
+              </span>
+              {% if item.date_added %}<span>Added {{ item.date_added.strftime('%Y-%m-%d') }}</span>{% endif %}
+            </div>
+            {% if item.arr_path %}
+            <p class="mt-1 text-xs text-slate-600 font-mono truncate" title="{{ item.arr_path }}">{{ item.arr_path }}</p>
+            {% elif item.file_path %}
+            <p class="mt-1 text-xs text-slate-600 font-mono truncate" title="{{ item.file_path }}">{{ item.file_path }}</p>
+            {% endif %}
+          </div>
+          {% if item.id != group.best_id %}
+          <button onclick="openDeleteModalSingle({{ item.id }}, '{{ item.title | replace("'", "\\'") }}')"
+            class="flex-shrink-0 px-3 py-1.5 rounded text-xs font-medium bg-red-900/20 text-red-400 hover:bg-red-900/40 transition">
+            Delete
+          </button>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateBatchToolbar() {
+  const cbs = document.querySelectorAll('.dup-group-cb:checked');
+  const all = document.querySelectorAll('.dup-group-cb');
+  const toolbar = document.getElementById('batch-toolbar');
+  const count = document.getElementById('batch-count');
+  const btn = document.getElementById('select-all-btn');
+  count.textContent = cbs.length + ' selected';
+  toolbar.classList.toggle('hidden', cbs.length === 0);
+  if (btn) btn.textContent = cbs.length === all.length ? 'Deselect all' : 'Select all';
+}
+
+function toggleSelectAll() {
+  const all = document.querySelectorAll('.dup-group-cb');
+  const checked = document.querySelectorAll('.dup-group-cb:checked');
+  const selectAll = checked.length < all.length;
+  all.forEach(cb => cb.checked = selectAll);
+  updateBatchToolbar();
+}
+
+function clearDupSelection() {
+  document.querySelectorAll('.dup-group-cb').forEach(cb => cb.checked = false);
+  updateBatchToolbar();
+}
+
+async function resolveSelected() {
+  const tmdbIds = [...document.querySelectorAll('.dup-group-cb:checked')].map(cb => parseInt(cb.dataset.tmdb));
+  if (!tmdbIds.length) return;
+  if (!confirm(`Resolve ${tmdbIds.length} duplicate group(s)? Keeps best quality, removes others from Sonarr/Radarr.`)) return;
+
+  try {
+    const resp = await fetch('/duplicates/resolve-batch', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tmdb_ids: tmdbIds})
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error, true); return; }
+    showToast(`Resolved ${data.resolved} group(s).`);
+    setTimeout(() => location.reload(), 1200);
+  } catch(e) {
+    showToast('Request failed.', true);
+  }
+}
+
+function resolveGroup(tmdbId, btn) {
+  if (!confirm('Keep the best-quality item and remove the others from Sonarr/Radarr (files kept on disk)?')) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  fetch(`/duplicates/${tmdbId}/resolve`, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { showToast(data.error, true); btn.disabled = false; btn.textContent = 'Keep Best'; return; }
+      const msg = `Kept "${data.kept}". Removed: ${data.deleted.join(', ') || 'none'}.${data.errors.length ? ' Errors: ' + data.errors.join('; ') : ''}`;
+      showToast(msg, data.errors.length > 0);
+      const card = btn.closest('.bg-\\[\\#1a1a2e\\]');
+      if (card) card.style.opacity = '0.4';
+      setTimeout(() => location.reload(), 1500);
+    })
+    .catch(() => { showToast('Request failed.', true); btn.disabled = false; btn.textContent = 'Keep Best'; });
+}
+</script>
+{% endblock %}

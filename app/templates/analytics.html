@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Analytics — Purgearr{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block page_body %}
+<main class="flex-1 max-w-5xl mx-auto w-full px-6 py-8">
+
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold text-white">Analytics</h2>
+    <p class="text-slate-400 text-sm mt-1">Library statistics and historical trends.</p>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="grid grid-cols-2 {% if stats.in_progress > 0 %}sm:grid-cols-3 lg:grid-cols-5{% else %}sm:grid-cols-4{% endif %} gap-4 mb-8">
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Total Items</p>
+      <p class="text-2xl font-bold text-white">{{ stats.total }}</p>
+      <p class="text-xs text-slate-500 mt-1">{{ stats.movies }} movies · {{ stats.series }} series</p>
+    </div>
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Total Size</p>
+      <p class="text-2xl font-bold text-white">{{ stats.total_size_gb | round(1) }} <span class="text-lg text-slate-400">GB</span></p>
+      <p class="text-xs text-slate-500 mt-1">{{ stats.movies_size_gb | round(1) }} GB movies · {{ stats.series_size_gb | round(1) }} GB series</p>
+    </div>
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Watched</p>
+      <p class="text-2xl font-bold text-green-400">{{ stats.watched }}</p>
+      {% if stats.total > 0 %}
+      <p class="text-xs text-slate-500 mt-1">{{ ((stats.watched / stats.total) * 100) | round(1) }}% of library</p>
+      {% endif %}
+    </div>
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Unwatched</p>
+      <p class="text-2xl font-bold text-[#e5a00d]">{{ stats.unwatched }}</p>
+      {% if stats.total > 0 %}
+      <p class="text-xs text-slate-500 mt-1">{{ ((stats.unwatched / stats.total) * 100) | round(1) }}% of library</p>
+      {% endif %}
+    </div>
+    {% if stats.in_progress > 0 %}
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">In Progress</p>
+      <p class="text-2xl font-bold text-blue-400">{{ stats.in_progress }}</p>
+      {% if stats.total > 0 %}
+      <p class="text-xs text-slate-500 mt-1">{{ ((stats.in_progress / stats.total) * 100) | round(1) }}% of library</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Charts -->
+  <div id="chart-no-data" class="hidden mb-6 text-sm text-slate-500 italic text-center py-8">
+    No historical data yet — charts will populate after the first sync.
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-5">
+      <p class="text-sm font-semibold text-white mb-4">Library Size over Time (GB)</p>
+      <div class="h-56">
+        <canvas id="chart-size"></canvas>
+      </div>
+    </div>
+    <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-5">
+      <p class="text-sm font-semibold text-white mb-4">Item Count over Time</p>
+      <div class="h-56">
+        <canvas id="chart-items"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top 10 Largest -->
+  {% if top_items %}
+  <div class="bg-[#1a1a2e] rounded-xl border border-slate-700/50 p-5">
+    <p class="text-sm font-semibold text-white mb-4">Top 10 Largest Items</p>
+    <div class="space-y-2">
+      {% for item in top_items %}
+      <div class="flex items-center gap-3">
+        <span class="px-1.5 py-0.5 rounded text-xs {% if item.media_type == 'movie' %}bg-[#e5a00d]/20 text-[#e5a00d]{% else %}bg-sky-900/40 text-sky-300{% endif %} flex-shrink-0 w-14 text-center">
+          {{ 'Movie' if item.media_type == 'movie' else 'Series' }}
+        </span>
+        <span class="text-sm text-white flex-1 truncate">{{ item.title }}</span>
+        <span class="text-sm font-mono text-slate-300 flex-shrink-0">
+          {{ ((item.file_size_bytes or 0) / 1073741824) | round(2) }} GB
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>document.addEventListener('DOMContentLoaded', initAnalyticsCharts);</script>
+{% endblock %}

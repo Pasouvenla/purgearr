@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>{% block title %}Purgearr{% endblock %}</title>
+
+  <!-- PWA / iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Purgearr" />
+  <meta name="theme-color" content="#e5a00d" />
+  <link rel="apple-touch-icon" href="/static/icon-180.png" />
+  <link rel="manifest" href="/static/manifest.json" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            accent: '#e5a00d',
+            'bg-base': '#0f0f1a',
+            'bg-card': '#1a1a2e',
+            'bg-surface': '#16213e',
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <style>
+    body { background-color: #0f0f1a; color: #e2e8f0; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #1a1a2e; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    .htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }
+    .htmx-request .htmx-indicator { opacity: 1; }
+    .htmx-request.htmx-indicator { opacity: 1; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="h-full dark">
+  {% block body %}
+  <div class="min-h-screen flex flex-col">
+
+    <!-- Top Nav -->
+    <header class="bg-[#1a1a2e] border-b border-slate-700/50 sticky top-0 z-40">
+      <div class="px-4 py-3 flex items-center justify-between gap-2">
+
+        <!-- Left: logo + desktop nav -->
+        <div class="flex items-center gap-4 min-w-0">
+          <a href="/dashboard" class="text-xl font-bold text-white hover:opacity-80 transition flex-shrink-0">
+            <span class="text-[#e5a00d]">Purge</span>arr
+          </a>
+          <nav class="hidden md:flex gap-1">
+            <a href="/dashboard" class="px-3 py-1.5 rounded text-sm font-medium transition
+              {% if request.url.path.startswith('/dashboard') %}bg-[#e5a00d]/10 text-[#e5a00d]
+              {% else %}text-slate-300 hover:bg-slate-700/50 hover:text-white{% endif %}">Dashboard</a>
+            <a href="/library" class="px-3 py-1.5 rounded text-sm font-medium transition
+              {% if request.url.path.startswith('/library') %}bg-[#e5a00d]/10 text-[#e5a00d]
+              {% else %}text-slate-300 hover:bg-slate-700/50 hover:text-white{% endif %}">Library</a>
+            <a href="/rules" class="px-3 py-1.5 rounded text-sm font-medium transition
+              {% if request.url.path.startswith('/rules') %}bg-[#e5a00d]/10 text-[#e5a00d]
+              {% else %}text-slate-300 hover:bg-slate-700/50 hover:text-white{% endif %}">Rules</a>
+            <a href="/analytics" class="px-3 py-1.5 rounded text-sm font-medium transition
+              {% if request.url.path.startswith('/analytics') %}bg-[#e5a00d]/10 text-[#e5a00d]
+              {% else %}text-slate-300 hover:bg-slate-700/50 hover:text-white{% endif %}">Analytics</a>
+            <a href="/duplicates" class="px-3 py-1.5 rounded text-sm font-medium transition
+              {% if request.url.path.startswith('/duplicates') %}bg-[#e5a00d]/10 text-[#e5a00d]
+              {% else %}text-slate-300 hover:bg-slate-700/50 hover:text-white{% endif %}">Duplicates</a>
+            <a href="/history" class="px-3 py-1.5 rounded text-sm font-medium transition
+              {% if request.url.path.startswith('/history') %}bg-[#e5a00d]/10 text-[#e5a00d]
+              {% else %}text-slate-300 hover:bg-slate-700/50 hover:text-white{% endif %}">History</a>
+            <a href="/settings" class="px-3 py-1.5 rounded text-sm font-medium transition
+              {% if request.url.path.startswith('/settings') %}bg-[#e5a00d]/10 text-[#e5a00d]
+              {% else %}text-slate-300 hover:bg-slate-700/50 hover:text-white{% endif %}">Settings</a>
+          </nav>
+        </div>
+
+        <!-- Right: extra actions + user + hamburger -->
+        <div class="flex items-center gap-2 flex-shrink-0">
+          {% block nav_extra %}{% endblock %}
+
+          <!-- Desktop user dropdown -->
+          {% if user is defined and user %}
+          <div class="hidden md:block relative group">
+            <button class="text-slate-300 hover:text-white text-sm px-2 py-1 rounded hover:bg-slate-700/50 transition">
+              {{ user.username }} ▾
+            </button>
+            <div class="absolute right-0 mt-1 w-36 bg-[#1a1a2e] border border-slate-700 rounded-lg shadow-xl hidden group-hover:block z-50">
+              <a href="/logout" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg">Sign out</a>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Hamburger (mobile only) -->
+          <button id="mobile-menu-btn" onclick="toggleMobileNav()"
+            class="md:hidden p-2 text-slate-400 hover:text-white rounded hover:bg-slate-700/50 transition"
+            aria-label="Menu">
+            <svg id="hamburger-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+            <svg id="close-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile nav menu -->
+      <div id="mobile-nav" class="hidden md:hidden border-t border-slate-700/50 bg-[#1a1a2e]">
+        <nav class="flex flex-col p-2 gap-0.5">
+          <a href="/dashboard" onclick="closeMobileNav()" class="px-4 py-3 rounded text-sm font-medium transition
+            {% if request.url.path.startswith('/dashboard') %}bg-[#e5a00d]/10 text-[#e5a00d]
+            {% else %}text-slate-300 hover:bg-slate-700/50{% endif %}">Dashboard</a>
+          <a href="/library" onclick="closeMobileNav()" class="px-4 py-3 rounded text-sm font-medium transition
+            {% if request.url.path.startswith('/library') %}bg-[#e5a00d]/10 text-[#e5a00d]
+            {% else %}text-slate-300 hover:bg-slate-700/50{% endif %}">Library</a>
+          <a href="/rules" onclick="closeMobileNav()" class="px-4 py-3 rounded text-sm font-medium transition
+            {% if request.url.path.startswith('/rules') %}bg-[#e5a00d]/10 text-[#e5a00d]
+            {% else %}text-slate-300 hover:bg-slate-700/50{% endif %}">Rules</a>
+          <a href="/analytics" onclick="closeMobileNav()" class="px-4 py-3 rounded text-sm font-medium transition
+            {% if request.url.path.startswith('/analytics') %}bg-[#e5a00d]/10 text-[#e5a00d]
+            {% else %}text-slate-300 hover:bg-slate-700/50{% endif %}">Analytics</a>
+          <a href="/duplicates" onclick="closeMobileNav()" class="px-4 py-3 rounded text-sm font-medium transition
+            {% if request.url.path.startswith('/duplicates') %}bg-[#e5a00d]/10 text-[#e5a00d]
+            {% else %}text-slate-300 hover:bg-slate-700/50{% endif %}">Duplicates</a>
+          <a href="/history" onclick="closeMobileNav()" class="px-4 py-3 rounded text-sm font-medium transition
+            {% if request.url.path.startswith('/history') %}bg-[#e5a00d]/10 text-[#e5a00d]
+            {% else %}text-slate-300 hover:bg-slate-700/50{% endif %}">History</a>
+          <a href="/settings" onclick="closeMobileNav()" class="px-4 py-3 rounded text-sm font-medium transition
+            {% if request.url.path.startswith('/settings') %}bg-[#e5a00d]/10 text-[#e5a00d]
+            {% else %}text-slate-300 hover:bg-slate-700/50{% endif %}">Settings</a>
+        </nav>
+        {% if user is defined and user %}
+        <div class="border-t border-slate-700/40 p-2">
+          <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 rounded text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+            </svg>
+            Sign out ({{ user.username }})
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </header>
+
+    {% block page_body %}{% endblock %}
+  </div>
+
+  <!-- Shared: Delete Modal -->
+  <!-- ⚠️ The card is CAPPED and scrolls its own middle. A bulk purge used to grow
+       it past the viewport, and because it is centred inside a fixed overlay it
+       ran off the top AND the bottom with no scrollbar anywhere, taking the
+       buttons with it: on 2026-11-12 a 22-item result was simply unreadable.
+       The cap lives on a wrapper INSIDE each step, not on the step itself,
+       because a step toggles `hidden` and `display:none` would fight a
+       `display:flex` utility on the same element. -->
+  <div id="delete-modal" class="fixed inset-0 bg-black/70 z-[60] hidden items-center justify-center p-4">
+    <div class="bg-[#1a1a2e] border border-slate-700/50 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+      <div id="delete-step-options">
+      <div class="flex flex-col max-h-[88vh]">
+      <div class="px-6 pt-6 pb-4 shrink-0">
+        <h3 class="text-lg font-semibold text-white mb-1">Confirm Deletion</h3>
+        <p id="delete-modal-desc" class="text-slate-400 text-sm">This will remove the selected items.</p>
+      </div>
+      <div class="px-6 overflow-y-auto min-h-0 space-y-3">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" id="opt-arr" checked class="w-4 h-4 accent-[#e5a00d]" />
+          <div>
+            <div class="text-sm font-medium text-white">Remove from Sonarr / Radarr</div>
+            <div class="text-xs text-slate-400">Removes item from arr monitoring</div>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" id="opt-torrent" class="w-4 h-4 accent-[#e5a00d]" />
+          <div>
+            <div class="text-sm font-medium text-white">Delete torrent from qBittorrent</div>
+            <div class="text-xs text-slate-400">Matched by infohash, cross-seed copies included</div>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" id="opt-files" class="w-4 h-4 accent-red-500" />
+          <div>
+            <div class="text-sm font-medium text-red-300">Delete local files</div>
+            <div class="text-xs text-red-400/70">Permanently removes files from disk — irreversible</div>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" id="opt-media-server" class="w-4 h-4 accent-red-500" />
+          <div>
+            <div class="text-sm font-medium text-red-300">Delete via media server</div>
+            <div class="text-xs text-red-400/70">Plex / Jellyfin deletes the files itself — the only option for items no arr tool manages</div>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" id="opt-seerr" class="w-4 h-4 accent-[#e5a00d]" />
+          <div>
+            <div class="text-sm font-medium text-white">Delete Seerr request</div>
+            <div class="text-xs text-slate-400">Removes the matching request from Overseerr / Jellyseerr</div>
+          </div>
+        </label>
+      </div>
+      <div class="px-6 pt-5 pb-6 shrink-0 flex gap-3">
+        <button onclick="goToReview()" class="flex-1 py-2.5 px-4 rounded-lg bg-[#e5a00d] hover:bg-[#f0b429] text-black font-semibold text-sm transition">
+          Review
+        </button>
+        <button onclick="closeDeleteModal()" class="flex-1 py-2.5 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium text-sm transition">
+          Cancel
+        </button>
+      </div>
+      </div>
+      </div>
+
+      <!-- Step 2. The purge that cost us was a bulk one: every item is listed
+           with what will happen to it, and anything carrying a warning starts
+           unticked so it has to be looked at before it goes. -->
+      <div id="delete-step-review" class="hidden">
+      <div class="flex flex-col max-h-[88vh]">
+        <div class="px-6 pt-5 pb-3 shrink-0 border-b border-slate-700/40">
+          <div class="flex items-center gap-2.5 mb-1">
+            <button onclick="backToOptions()" aria-label="Back to options" class="p-1 rounded text-slate-400 hover:text-white transition">
+              <svg class="w-4.5 h-4.5" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <h3 class="text-lg font-semibold text-white">Review before deleting</h3>
+          </div>
+          <div class="flex items-center gap-2 ml-8 mb-3">
+            <span class="text-[11px] text-slate-400">Step 2 of 2</span>
+            <span class="h-[3px] w-11 rounded-sm bg-[#e5a00d]"></span>
+            <span class="h-[3px] w-11 rounded-sm bg-[#e5a00d]"></span>
+          </div>
+          <!-- The counts ARE the bulk controls: ticking eleven warned rows by
+               hand is what made the 2026-11-12 purge tedious enough to rush. -->
+          <div id="delete-review-counts" class="grid grid-cols-3 gap-1.5"></div>
+          <div id="delete-review-notes" class="mt-3 space-y-1.5"></div>
+        </div>
+        <!-- ⚠️ ONE scrolling region for both the list and the result. Giving the
+             result its own vh cap looked right and was not: header + result +
+             footer then exceeded the column cap, and since the card clips its
+             overflow, the Cancel button was silently cut off. Let flex share
+             the middle and the footer can never be pushed out. -->
+        <div class="px-6 py-4 overflow-y-auto min-h-0">
+          <div id="delete-review-list" class="space-y-2"></div>
+          <div id="delete-result" class="mt-3 hidden"></div>
+        </div>
+        <div class="px-6 pt-4 pb-5 shrink-0 border-t border-slate-700/40">
+          <div class="flex gap-3">
+            <button id="delete-confirm-btn" onclick="confirmDelete()" class="flex-1 py-2.5 px-4 rounded-lg bg-red-700 hover:bg-red-600 text-white font-semibold text-sm transition">
+              Delete
+            </button>
+            <button onclick="closeDeleteModal()" class="py-2.5 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium text-sm transition">
+              Cancel
+            </button>
+          </div>
+          <p id="delete-review-footnote" class="text-[11px] text-slate-400 text-center mt-2.5"></p>
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=11"></script>
+  {% block scripts %}{% endblock %}
+  {% endblock %}
+</body>
+</html>
