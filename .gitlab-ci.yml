@@ -1,0 +1,179 @@
+stages:
+  - lint
+  - build
+  - release
+
+variables:
+  IMAGE: $CI_REGISTRY_IMAGE
+
+# ─────────────────────────────────────────────
+# 1. Lint — syntaxe Python + import check
+# ─────────────────────────────────────────────
+lint:
+  stage: lint
+  image: python:3.12-slim
+  cache:
+    key: pip-$CI_COMMIT_REF_SLUG
+    paths:
+      - .pip/
+  before_script:
+    - pip install --cache-dir .pip -q -r requirements.txt
+  script:
+    - find app scripts -name "*.py" -print0 | xargs -0 python3 -m py_compile
+    - echo "✅ Syntaxe OK"
+    - >
+      DATABASE_URL="sqlite:////tmp/ci.db" SECRET_KEY="ci-key"
+      python3 -c "from app.main import app; print('✅ Import OK')"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+# ─────────────────────────────────────────────
+# 2. Tests — suite pytest
+# ─────────────────────────────────────────────
+test:
+  stage: lint
+  image: python:3.12-slim
+  cache:
+    key: pip-$CI_COMMIT_REF_SLUG
+    paths:
+      - .pip/
+  before_script:
+    - pip install --cache-dir .pip -q -r requirements.txt pytest
+  script:
+    - DATABASE_URL="sqlite:////tmp/ci.db" SECRET_KEY="ci-key" python3 -m pytest tests/ -q
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+# ─────────────────────────────────────────────
+# 3. Sécurité — scan CVE des dépendances pip
+# ─────────────────────────────────────────────
+dependency-audit:
+  stage: lint
+  image: python:3.12-slim
+  cache:
+    key: pip-audit-$CI_COMMIT_REF_SLUG
+    paths:
+      - .pip/
+  before_script:
+    - pip install --cache-dir .pip -q pip-audit
+  script:
+    - pip-audit -r requirements.txt --desc on
+  allow_failure: true   # ne bloque pas le build, mais apparaît en warning
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
+# ─────────────────────────────────────────────
+# 3. Build & push Docker — latest sur main, tag sur release
+# ─────────────────────────────────────────────
+docker-build:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        MINOR=$(echo "$CI_COMMIT_TAG" | sed 's/^v//' | cut -d. -f1,2)
+        docker build --no-cache \
+          -t "$IMAGE:$CI_COMMIT_TAG" \
+          -t "$IMAGE:$MINOR" \
+          -t "$IMAGE:latest" .
+        docker push "$IMAGE:$CI_COMMIT_TAG"
+        docker push "$IMAGE:$MINOR"
+        docker push "$IMAGE:latest"
+        echo "✅ Pushed $IMAGE:$CI_COMMIT_TAG + $IMAGE:$MINOR + $IMAGE:latest"
+      else
+        docker build --no-cache -t "$IMAGE:latest" .
+        docker push "$IMAGE:latest"
+        echo "✅ Pushed $IMAGE:latest"
+      fi
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+
+# ─────────────────────────────────────────────
+# 4. Release — génère le CHANGELOG via git-cliff, crée la GitLab Release
+# ─────────────────────────────────────────────
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+  before_script:
+    - apk add --no-cache curl --quiet
+    # Install git-cliff from GitHub releases (static binary, no runtime deps)
+    - |
+      CLIFF_VERSION="2.13.1"
+      curl -sSL "https://github.com/orhun/git-cliff/releases/download/v${CLIFF_VERSION}/git-cliff-${CLIFF_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+        | tar xz --strip-components=1 -C /usr/local/bin git-cliff-${CLIFF_VERSION}/git-cliff
+      git-cliff --version
+  script:
+    # Generate release notes for this tag only (since previous tag)
+    - git-cliff --current --strip header 2>/dev/null > release_notes.md || echo "See CHANGELOG.md for details." > release_notes.md
+    - echo "--- Release notes ---" && cat release_notes.md
+  release:
+    name: "Purgearr $CI_COMMIT_TAG"
+    description: ./release_notes.md
+    tag_name: "$CI_COMMIT_TAG"
+
+# ─────────────────────────────────────────────
+# 5. Miroir GitHub — republie la source en UN SEUL commit
+#
+# ⚠️ PAS le miroir natif de GitLab (Settings → Repository → Mirroring) : celui-ci
+#    pousse l'historique COMPLET, dont chaque commit porte l'adresse personnelle
+#    de l'auteur. On republie donc un instantané de l'arbre courant, signé d'une
+#    adresse noreply, et on écrase le dépôt GitHub à chaque fois.
+#
+# Passe après le build : un pipeline cassé ne doit pas être publié.
+#
+# Prérequis, à créer une fois dans Settings → CI/CD → Variables :
+#   GITHUB_MIRROR_TOKEN — jeton GitHub à portée « Contents: read and write » sur
+#   Pasouvenla/purgearr seulement. Le cocher **Masked** et **Protected**.
+#   Sans cette variable la tâche ne se déclenche pas, elle n'échoue pas.
+# ─────────────────────────────────────────────
+mirror-github:
+  stage: release
+  # ⚠️ entrypoint neutralise : l'image alpine/git declare ENTRYPOINT ["git"], donc
+  # le script du runner, lance en "sh -c ...", devenait "git sh -c ..." et le job
+  # echouait sur « git: 'sh' is not a git command ». Vu le 12/11/2026.
+  image:
+    name: alpine/git:latest
+    entrypoint: [""]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $GITHUB_MIRROR_TOKEN'
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: 1
+    MIRROR_REPO: "Pasouvenla/purgearr"
+    MIRROR_NAME: "Pasouvenla"
+    MIRROR_EMAIL: "78430485+Pasouvenla@users.noreply.github.com"
+  script:
+    - |
+      set -e
+      # git archive ne sort que les fichiers SUIVIS : ni .git, ni artefacts de CI,
+      # ni rien que .gitignore écarte.
+      mkdir -p /tmp/mirror
+      git archive HEAD | tar -x -C /tmp/mirror
+      cd /tmp/mirror
+      git init -q -b main
+      git config user.name "$MIRROR_NAME"
+      git config user.email "$MIRROR_EMAIL"
+      git add -A
+      git commit -q -m "Purgearr: media library cleanup automation for self-hosted homelabs" \
+                    -m "Published from GitLab $CI_COMMIT_SHORT_SHA as a single commit. The development history lives there, with the CI, the container registry and the releases."
+      # Le jeton passe par un fichier d'identifiants, jamais par l'URL du remote :
+      # une URL finit dans .git/config et dans la trace de la commande.
+      git config credential.helper store
+      printf 'https://x-access-token:%s@github.com\n' "$GITHUB_MIRROR_TOKEN" > ~/.git-credentials
+      chmod 600 ~/.git-credentials
+      git push --force --quiet "https://github.com/${MIRROR_REPO}.git" main
+      rm -f ~/.git-credentials
+      echo "✅ Miroir à jour : https://github.com/${MIRROR_REPO} ($CI_COMMIT_SHORT_SHA)"

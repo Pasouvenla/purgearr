@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Purgearr{% endblock %}
+
+{% block nav_extra %}
+<button id="dash-sync-btn"
+  hx-post="/library/sync"
+  hx-swap="none"
+  hx-indicator="#dash-sync-spinner"
+  onclick="handleDashSync()"
+  class="px-3 py-1.5 rounded text-sm font-medium bg-[rgb(var(--accent-rgb)/0.10)] text-[var(--accent)] hover:bg-[rgb(var(--accent-rgb)/0.20)] border border-[rgb(var(--accent-rgb)/0.30)] transition flex items-center gap-1.5">
+  <svg id="dash-sync-spinner" class="htmx-indicator w-3.5 h-3.5 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+  </svg>
+  <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+  </svg>
+  <span class="hidden sm:inline">Sync</span>
+</button>
+{% endblock %}
+
+{% block page_body %}
+<main class="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
+  {%- macro volume(gb) -%}
+    {%- if gb >= 1024 -%}{{ (gb / 1024) | round(2) }} TB{%- else -%}{{ gb }} GB{%- endif -%}
+  {%- endmacro %}
+
+  <!-- The figure a decision hangs on, then the three that frame it. -->
+  <header class="mb-8 pb-6 border-b border-[var(--filet)]">
+    <div class="flex flex-wrap items-end gap-9">
+      <div class="flex-1 basis-80 min-w-0">
+        <h2 class="text-base font-semibold text-[var(--doux)] mb-1">Dashboard</h2>
+        <p class="text-3xl font-bold text-[var(--accent)] leading-tight tabular-nums">{{ volume(stale_90_size_gb) }}</p>
+        <p class="text-sm text-[var(--doux)] mt-1">
+          not watched in over 90 days, out of {{ volume(total_size_gb) }} held
+          across {{ total_movies }} movies and {{ total_series }} series.
+        </p>
+      </div>
+      <dl class="flex flex-wrap m-0">
+        <div class="pr-6">
+          <dt class="text-sm text-[var(--doux)] mb-2">Never watched</dt>
+          <dd class="m-0 text-xl font-bold text-[var(--texte)] tabular-nums">{{ never_watched_count }}
+            <span class="text-sm font-normal text-[var(--doux)]">· {{ volume(never_watched_size_gb) }}</span></dd>
+        </div>
+        <div aria-hidden="true" class="w-px bg-[var(--filet)]"></div>
+        <div class="px-6">
+          <dt class="text-sm text-[var(--accent)] mb-2">Stale 90 days</dt>
+          <dd class="m-0 text-xl font-bold text-[var(--accent)] tabular-nums">{{ stale_90_count }}
+            <span class="text-sm font-normal text-[var(--doux)]">· {{ volume(stale_90_size_gb) }}</span></dd>
+        </div>
+        <div aria-hidden="true" class="w-px bg-[var(--filet)]"></div>
+        <div class="pl-6">
+          <dt class="text-sm text-[var(--doux)] mb-2">Library</dt>
+          <dd class="m-0 text-xl font-bold text-[var(--texte)] tabular-nums">{{ total_items }}
+            <span class="text-sm font-normal text-[var(--doux)]">· {{ volume(total_size_gb) }}</span></dd>
+        </div>
+      </dl>
+    </div>
+  </header>
+
+  <!-- Both charts answer "where does the space go", so both are read in bytes. -->
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-8">
+
+    <div>
+      <h3 class="text-sm font-semibold text-[var(--accent)] mb-1">Where the space goes</h3>
+      <p class="text-sm text-[var(--doux)] mb-4">By resolution, measured in gigabytes held rather than in number of titles. {{ volume(total_size_gb) }} in all.</p>
+      {% if resolution_bars %}
+      <ul class="list-none m-0 p-0 flex flex-col gap-4">
+        {% for bar in resolution_bars %}
+        <li>
+          <div class="flex justify-between items-baseline gap-3 text-sm mb-2">
+            <span class="text-[var(--texte)]">{{ bar.label }}</span>
+            <span class="tabular-nums text-[var(--accent)] font-semibold whitespace-nowrap">{{ volume(bar.size_gb) }}
+              <span class="text-[var(--doux)] font-normal">· {{ bar.count }} titles · {{ bar.pct }}%</span></span>
+          </div>
+          <div aria-hidden="true" class="h-4 bg-[var(--fond)]">
+            <div class="h-4" style="width: {{ bar.pct }}%;
+              {% if bar.unknown %}background: repeating-linear-gradient(135deg, var(--sourd) 0 6px, var(--filet-fort) 6px 12px){% else %}background: var(--accent){% endif %}"></div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% if unclassified_count %}
+      <p class="mt-4 flex gap-2 items-start text-sm text-[var(--alerte)] leading-relaxed">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" role="img" aria-label="Caveat" class="flex-shrink-0 mt-1">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>
+        </svg>
+        <span>The {{ unclassified_count }} hatched titles carry no resolution, which is {{ unclassified_pct }}% of the volume,
+          {{ volume(unclassified_size_gb) }}. They are series: their episodes have no single resolution and nothing
+          aggregates it at series level yet.</span>
+      </p>
+      {% endif %}
+      {% else %}
+      <p class="text-[var(--sourd)] text-sm">No data — sync your library first.</p>
+      {% endif %}
+    </div>
+
+    <div>
+      <h3 class="text-sm font-semibold text-[var(--accent)] mb-1">By codec</h3>
+      <p class="text-sm text-[var(--doux)] mb-4">Counted in titles: what matters here is how many files a re-encode would touch.</p>
+      {% if codec_bars %}
+      <ul class="list-none m-0 p-0 flex flex-col gap-4">
+        {% for bar in codec_bars %}
+        <li>
+          <div class="flex justify-between items-baseline gap-3 text-sm mb-2">
+            <span class="text-[var(--texte)]">{{ bar.label }}</span>
+            <span class="tabular-nums text-[var(--doux)] whitespace-nowrap">{{ bar.count }} titles · {{ volume(bar.size_gb) }}</span>
+          </div>
+          <div aria-hidden="true" class="h-4 bg-[var(--fond)]">
+            <div class="h-4" style="width: {{ bar.pct }}%;
+              {% if bar.unknown %}background: repeating-linear-gradient(135deg, var(--sourd) 0 6px, var(--filet-fort) 6px 12px){% else %}background: var(--accent){% endif %}"></div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-[var(--sourd)] text-sm">No data — sync your library first.</p>
+      {% endif %}
+    </div>
+
+  </section>
+
+  <!-- Most Stale Content -->
+  <section class="mb-8">
+    <div class="flex items-baseline justify-between gap-4 mb-1">
+      <h3 class="text-sm font-semibold text-[var(--accent)]">What sleeps and weighs</h3>
+      <a href="/library?watch_status=unwatched" class="text-sm text-[var(--accent)] hover:text-[var(--accent-survol)]">See all {{ stale_90_count }} items</a>
+    </div>
+    <p class="text-sm text-[var(--doux)] mb-4">Not watched in over 90 days, heaviest first.</p>
+    {% if most_stale %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left border-b border-[rgb(var(--filet-rgb)/0.50)]">
+            <th scope="col" class="pb-2.5 text-sm text-[var(--doux)] font-semibold">Title</th>
+            <th scope="col" class="pb-2.5 text-sm text-[var(--doux)] font-semibold">Type</th>
+            <th scope="col" class="pb-2.5 text-sm text-[var(--doux)] font-semibold">Last watched</th>
+            <th scope="col" class="pb-2.5 text-sm text-[var(--doux)] font-semibold text-right">Would free</th>
+            <th scope="col" class="pb-2.5 text-sm text-[var(--doux)] font-semibold text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[rgb(var(--filet-rgb)/0.30)]">
+          {% for item in most_stale %}
+          {% set size_gb = (item.file_size_bytes / 1073741824) | round(1) if item.file_size_bytes else 0 %}
+          <tr data-item-id="{{ item.id }}" class="hover:bg-[rgb(var(--surface-2-rgb)/0.40)] transition">
+            <th scope="row" class="py-2.5 pr-4 text-left font-normal">
+              <span class="text-[var(--texte-fort)]">{{ item.title }}</span>
+              {% if item.year %}<span class="text-[var(--doux)] text-sm ml-1">({{ item.year }})</span>{% endif %}
+            </th>
+            <td class="py-2.5 pr-4">
+              <span class="px-1.5 py-0.5 rounded text-xs
+                {% if item.media_type == 'movie' %}bg-[rgb(var(--accent-rgb)/0.20)] text-[var(--accent)]{% else %}bg-sky-900/40 text-sky-300{% endif %}">
+                {{ 'Movie' if item.media_type == 'movie' else 'Series' }}
+              </span>
+            </td>
+            <td class="py-2.5 pr-4 text-[var(--doux)]">
+              {% if item.last_watched %}{{ item.last_watched.strftime('%Y-%m-%d') }}{% else %}never{% endif %}
+            </td>
+            <td class="py-2.5 pr-4 text-right">
+              <span class="inline-flex items-center gap-3 justify-end">
+                <span aria-hidden="true" class="hidden sm:block w-20 h-2 bg-[var(--fond)]">
+                  <span class="block h-2 bg-[var(--accent)]"
+                    style="width: {% if most_stale_max_bytes %}{{ ((item.file_size_bytes or 0) / most_stale_max_bytes * 100) | round }}{% else %}0{% endif %}%"></span>
+                </span>
+                <span class="tabular-nums text-[var(--accent)] font-semibold">{{ size_gb }} GB</span>
+              </span>
+            </td>
+            <td class="py-2.5 text-right">
+              <button onclick="openDeleteModalSingle({{ item.id }}, '{{ item.title | replace("'", "\\'") }}')"
+                class="px-2.5 py-1 rounded text-xs font-medium bg-red-900/30 text-red-300 border border-red-700/40 hover:bg-red-900/50 transition">
+                Delete
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-[var(--sourd)] text-sm">No items found. Sync your library to see data.</p>
+    {% endif %}
+  </section>
+
+  <!-- Recently Added -->
+  <section>
+    <h3 class="text-sm font-semibold text-[var(--accent)] mb-4">Recently added</h3>
+    {% if recently_added %}
+    <div class="divide-y divide-[rgb(var(--filet-rgb)/0.30)]">
+      {% for item in recently_added %}
+      {% set size_gb = (item.file_size_bytes / 1073741824) | round(1) if item.file_size_bytes else 0 %}
+      <div class="flex items-center justify-between py-2.5">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="px-1.5 py-0.5 rounded text-xs flex-shrink-0
+            {% if item.media_type == 'movie' %}bg-[rgb(var(--accent-rgb)/0.20)] text-[var(--accent)]{% else %}bg-sky-900/40 text-sky-300{% endif %}">
+            {{ 'M' if item.media_type == 'movie' else 'S' }}
+          </span>
+          <span class="text-sm text-white truncate">{{ item.title }}</span>
+          {% if item.year %}<span class="text-[var(--sourd)] text-xs flex-shrink-0">({{ item.year }})</span>{% endif %}
+        </div>
+        <div class="flex items-center gap-4 flex-shrink-0 ml-4">
+          <span class="text-xs text-[var(--doux)]">{{ size_gb }} GB</span>
+          {% if item.date_added %}
+          <span class="text-xs text-[var(--sourd)]">{{ item.date_added.strftime('%Y-%m-%d') }}</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-[var(--sourd)] text-sm">No items found. Sync your library to see data.</p>
+    {% endif %}
+  </section>
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function handleDashSync() {
+  document.getElementById('dash-sync-btn').addEventListener('htmx:afterRequest', function(e) {
+    const xhr = e.detail.xhr;
+
+    // htmx fires afterRequest whatever came back, including when nothing from
+    // this application answered at all. Anything unreadable used to fall into a
+    // catch that said "Sync complete.", so a sync that never ran reported
+    // success. Each case now gets its own message, and only a real one reloads.
+    if (!xhr || !xhr.status) {
+      showToast('Sync failed: the server could not be reached.', true);
+      return;
+    }
+
+    let data = null;
+    try {
+      data = JSON.parse(xhr.responseText);
+    } catch {
+      data = null;
+    }
+
+    // A 2xx carrying something other than JSON means the request was answered
+    // before it reached Purgearr: a reverse proxy bot-protection challenge, a
+    // sign-in page, an error page. The 302 such a challenge returns makes the
+    // browser replay a POST as a GET, so the body is lost and the sync never
+    // starts.
+    if (data === null) {
+      showToast(
+        'Sync did not run: the answer came back as ' + xhr.status +
+        ' without JSON, so something replied instead of Purgearr. If a reverse ' +
+        'proxy sits in front, its session has probably expired: reload the page ' +
+        'and try again.', true);
+      return;
+    }
+
+    if (xhr.status === 429) {
+      showToast('Sync refused: too many attempts, this route allows 5 per minute. Wait a moment.', true);
+      return;
+    }
+    if (xhr.status === 401) {
+      showToast('Sync refused: your session has expired. Sign in again.', true);
+      return;
+    }
+    if (xhr.status < 200 || xhr.status >= 300 || data.status !== 'ok') {
+      showToast('Sync failed: ' + (data.message || data.error || 'the server returned ' + xhr.status) + '.', true);
+      return;
+    }
+
+    showToast(`Sync complete: +${data.added} added, ${data.updated} updated, ${data.removed} removed`);
+    setTimeout(() => location.reload(), 1000);
+  }, { once: true });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Changelog — Purgearr{% endblock %}
+
+{% block page_body %}
+<main class="flex-1 max-w-3xl mx-auto w-full px-6 py-8">
+
+  <h2 class="text-2xl font-bold text-white mb-6">Changelog</h2>
+
+  {% if not sections %}
+  <p class="text-[var(--sourd)] text-sm">No changelog found.</p>
+  {% else %}
+  <div class="space-y-8">
+    {% for section in sections %}
+    <div class="bg-[var(--surface)] rounded-xl border border-[rgb(var(--filet-rgb)/0.50)] p-6">
+      <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-3">
+        {{ section.version }}
+        {% if loop.first %}
+        <span class="px-2 py-0.5 rounded-full text-xs bg-[rgb(var(--accent-rgb)/0.20)] text-[var(--accent)]">Latest</span>
+        {% endif %}
+      </h3>
+      {% if section.groups %}
+        {% for group_name, items in section.groups.items() %}
+        {% if items %}
+        <div class="mb-4">
+          <p class="text-xs font-semibold uppercase tracking-wider mb-2
+            {% if group_name == 'Added' %}text-green-400
+            {% elif group_name == 'Changed' %}text-blue-400
+            {% elif group_name == 'Fixed' %}text-yellow-400
+            {% elif group_name == 'Removed' %}text-red-400
+            {% else %}text-[var(--doux)]{% endif %}">
+            {{ group_name }}
+          </p>
+          <ul class="space-y-1.5">
+            {% for item in items %}
+            <li class="text-sm text-[var(--texte)] flex gap-2">
+              <span class="text-[var(--filet-fort)] flex-shrink-0 mt-0.5">—</span>
+              <span>{{ item }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% endfor %}
+      {% else %}
+      <p class="text-sm text-[var(--sourd)] italic">No details available.</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</main>
+{% endblock %}

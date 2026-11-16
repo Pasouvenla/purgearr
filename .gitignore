@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+*.so
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.env
+
+# Data & database
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Poster cache
+poster_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Docker overrides
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.claude/
+CLAUDE.md

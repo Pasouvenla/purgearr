@@ -1,0 +1,13 @@
+services:
+  purgearr:
+    image: registry.gitlab.com/grumpypillow/purgearr:latest
+    container_name: purgearr
+    ports:
+      - "8765:8765"
+    volumes:
+      - /opt/docker/purgearr/data:/data
+    environment:
+      - DATABASE_URL=sqlite:////data/purgearr.db
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
+      - TZ=Europe/Paris
+    restart: unless-stopped
